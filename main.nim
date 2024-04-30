@@ -35,7 +35,7 @@ eraseScreen()
 #  cursorUp 1
 #  eraseLine()
 setCursorPos(0, 0)
-let entireFile = readFile("greetings.nim")
+let entireFile = readFile("main.nim")
 echo entireFile
 setCursorPos(0, 0)
 while true:
