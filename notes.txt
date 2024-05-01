@@ -3,3 +3,9 @@ create a buffer of the file
 be able to edit that buffer
 
 be able to write to file
+
+
+
+
+Later:
+settings page
