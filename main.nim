@@ -6,51 +6,78 @@ type
     down: Natural
     right: Natural
 
+  CursorAlignment = enum Position, End
+
+  Cursor = object
+    y: Natural
+    case alignment: CursorAlignment
+    of Position: x: Natural
+    of End: discard 
+
   TerminalBuffer = ref object
     width: int
     height: int
     buf: seq[string]
-    cursorX: Natural
-    cursorY: Natural
+    cursor: Cursor
     scroll: Scroll
 
-proc positionCursorTerminalBuffer(tb: TerminalBuffer, x, y: Natural): TerminalBuffer =
-  if y >= tb.buf.len():
-    tb.cursorY = tb.buf.len()
-  else:
-    tb.cursorY = y
-  let lineLen = tb.buf[tb.cursorY].len()
-  if x >= lineLen:
-    tb.cursorX = lineLen
-  else:
-    tb.cursorX = x
-  return tb
 
 func handleInput(tb: TerminalBuffer, ch: char): TerminalBuffer = 
-  var currX: Natural = tb.cursorX
-  var currY: Natural = tb.cursorY
   case ch:
   of 'j':
-    currY += 1
+    if tb.buf.len <= tb.cursor.y + 1:
+      tb.cursor.y = tb.buf.len - 1
+    else:
+      tb.cursor.y += 1
   of 'k':
-    currY -= 1
+    if tb.cursor.y == 0:
+      tb.cursor.y = 0
+    else:
+      tb.cursor.y -= 1
   of 'l':
-    currX += 1
+    case tb.cursor.alignment:
+    of Position:
+      let lineLen = tb.buf[tb.cursor.y].len()
+      if tb.cursor.x + 1 > lineLen:
+        tb.cursor.x = lineLen
+      elif tb.cursor.x + 1 < 0:
+        tb.cursor.x = 0
+      else:
+        tb.cursor.x += 1
+    of End: discard
   of 'h':
-    currX -= 1
+    let lineLen = tb.buf[tb.cursor.y].len()
+    case tb.cursor.alignment:
+    of Position:
+      if tb.cursor.x - 1 > lineLen:
+        if lineLen > 0:
+          tb.cursor.x = lineLen - 1
+        else:
+          tb.cursor.x = 0
+      elif tb.cursor.x - 1 < 0:
+        tb.cursor.x = 0
+      else:
+        tb.cursor.x -= 1
+    of End:
+      tb.cursor.alignment = Position
+      if lineLen == 0:
+        tb.cursor.x = 0
+      else:
+        tb.cursor.x = lineLen - 1
   of 'q':
     quit()
-  else:
-    return tb
-  return tb.positionCursorTerminalBuffer(currX, currY)
+  else: discard
+
+  return tb
 
 proc createTerminalBuffer(width, height: Natural): TerminalBuffer =
   let tb: TerminalBuffer = TerminalBuffer()
   tb.width = width
   tb.height = height
   newSeq(tb.buf, height)
-  tb.cursorX = 0
-  tb.cursorY = 0
+  tb.cursor.alignment = Position
+  tb.cursor.x = 0
+  tb.cursor.y = 0
   return tb
 
 
@@ -63,7 +90,14 @@ proc flushTerminalBuffer(tb: TerminalBuffer) =
   for i, line in tb.getVisibleBuffer():
     setCursorPos(0, i)
     stdout.write(line)
-  setCursorPos(tb.cursorX, tb.cursorY)
+  case tb.cursor.alignment:
+  of Position:
+    if tb.cursor.x > tb.buf[tb.cursor.y].len:
+      setCursorPos(tb.buf[tb.cursor.y].len, tb.cursor.y)
+    else:
+      setCursorPos(tb.cursor.x, tb.cursor.y)
+  of End:
+    setCursorPos(tb.buf[tb.cursor.y].len, tb.cursor.y)
 
 func inputTerminalBuffer(tb: TerminalBuffer, input: seq): TerminalBuffer =
   tb.buf = input
